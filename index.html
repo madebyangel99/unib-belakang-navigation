@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNIB Belakang Navigation — Shortest Path Tracking</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        #map { height: 100%; width: 100%; min-height: 100%; z-index: 1; }
+    </style>
+</head>
+<body class="bg-[#f8fafc] font-sans text-slate-800 antialiased min-h-screen flex flex-col m-0 p-0">
+
+    <nav class="bg-[#11206a] text-[#f8fafc] shadow-lg border-b-4 border-[#a99702] sticky top-0 z-50">
+        <div class="w-full mx-auto px-6 py-3 flex flex-col lg:flex-row items-center justify-between gap-4">
+            
+            <div class="flex items-center gap-4 w-full lg:w-auto justify-center lg:justify-start">
+                <div class="h-16 w-16 rounded-xl bg-white flex items-center justify-center overflow-hidden shrink-0 border border-white/30 p-1 shadow-inner">
+                    <img src="logo-unib.png" alt="Logo UNIB" id="logoUnib" class="h-full w-full object-contain">
+                </div>
+                <div class="text-center lg:text-left">
+                    <h1 class="text-xl font-black tracking-tight text-[#f8fafc] leading-tight">UNIB Belakang Navigation</h1>
+                    <p class="text-[10px] text-[#a99702] font-semibold tracking-wider uppercase mt-0.5">
+                        Adaptasi AI: Algoritma Dijkstra Terbobot Dinamis (Waktu & Hari)
+                    </p>
+                    <div class="inline-flex items-center gap-1.5 mt-1.5 px-2 py-0.5 rounded-md bg-white/10 border border-white/10 text-[10px] text-slate-300">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <span>Created by: <strong class="text-white font-bold">Angelita Rahmatun Annisa</strong> (NPM: G1A024067)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full lg:w-auto bg-white/10 p-2 rounded-xl backdrop-blur-sm">
+                <div class="w-full sm:w-auto">
+                    <select id="inputHari" class="w-full lg:w-40 p-2 bg-[#11206a] text-[#f8fafc] border border-white/20 rounded-lg text-xs font-medium outline-none focus:border-[#a99702]">
+                        <option value="kerja">Senin - Jumat</option>
+                        <option value="weekend">Sabtu - Minggu</option>
+                    </select>
+                </div>
+
+                <div class="w-full sm:w-auto">
+                    <input type="time" id="inputTime" value="10:00" class="w-full p-2 bg-[#11206a] text-[#f8fafc] border border-white/20 rounded-lg text-xs font-medium outline-none focus:border-[#a99702]">
+                </div>
+
+                <div class="w-full sm:w-auto relative">
+                    <input list="lokasiList" id="startNode" value="Gerbang Masuk" placeholder="Titik Awal..." class="w-full lg:w-48 p-2 bg-[#f8fafc] text-slate-900 placeholder-slate-400 rounded-lg text-xs font-medium outline-none focus:ring-2 focus:ring-[#a99702]">
+                </div>
+
+                <div class="text-[#a99702] hidden sm:block font-bold">➔</div>
+
+                <div class="w-full sm:w-auto relative">
+                    <input list="lokasiList" id="endNode" value="Gedung GB5" placeholder="Titik Tujuan..." class="w-full lg:w-48 p-2 bg-[#f8fafc] text-slate-900 placeholder-slate-400 rounded-lg text-xs font-medium outline-none focus:ring-2 focus:ring-[#a99702]">
+                </div>
+
+                <datalist id="lokasiList"></datalist>
+
+                <button onclick="prosesPencarianJalur()" class="w-full sm:w-auto bg-[#a99702] hover:bg-[#8e7e02] text-[#f8fafc] font-bold text-xs py-2 px-4 rounded-lg shadow transition duration-200 uppercase tracking-wider">
+                    Cari Rute
+                </button>
+            </div>
+
+        </div>
+    </nav>
+
+    <div class="flex-grow w-full flex flex-col md:flex-row h-[calc(100vh-88px)] p-4 gap-4 overflow-hidden">
+        
+        <div id="sidePanel" class="hidden w-full md:w-80 lg:w-96 bg-white p-5 rounded-2xl shadow-md border border-slate-200 flex-col gap-4 h-full shrink-0 overflow-hidden">
+            <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest border-b pb-2 flex items-center gap-2">
+                📋 Detail Hasil Pencarian
+            </h2>
+            
+            <div id="hasilInfo" class="flex-grow overflow-y-auto space-y-4 pr-1"></div>
+        </div>
+
+        <div id="mapWrapper" class="flex-grow bg-white p-2 rounded-2xl shadow-xl border border-slate-200 h-full relative">
+            <div id="map" class="rounded-xl"></div>
+        </div>
+
+    </div>
+
+    <script>
+        // KOORDINAT TITIK KAMPUS
+        const nodes = {
+            "Gerbang Keluar": [-3.759356082679988, 102.27620478124236],
+            "Gerbang Masuk": [-3.759577166889533, 102.27511893639122],
+            "Gerbang Rektorat": [-3.7606332905402904, 102.2726371975201],
+            "Gedung Rektorat UNIB": [-3.7593690314480206, 102.27235244963148],
+            "Gedung GB5": [-3.7554612742834395, 102.27638350369625],
+            "Gedung Dekanat Teknik": [-3.758711950725617, 102.27671505155469],
+            "Laboratorium Fakultas Teknik": [-3.7589287422927424, 102.27676333131582],
+            "Gedung Sekre Teknik": [-3.758246250133572, 102.27736414613804],
+            "Laboratorium Terpadu Teknik Informatika": [-3.7585808051783998, 102.27729172649424],
+            "Gedung GLT": [-3.758042440780505, 102.27185754507934],
+            "Danau": [-3.758389863319991, 102.27278942221876],
+            "GSG": [-3.7577015441649313, 102.27656173115679],
+            "Simpang PKM Belakang": [-3.756043831170103, 102.27561720401069],
+            "Jalan Belakang PKM": [-3.756074020901313, 102.27582558989614],
+            "Jalan Dekanat FMIPA": [-3.755608318900689, 102.27472588419562],
+            "Jalan Jurusan Budidaya Pertanian": [-3.75627743089022, 102.27295026183013],
+            "Jalan Belakang GLT": [-3.7567539129628336, 102.27150790546798],
+            "Jalan Teknologi Pertanian": [-3.75771066673857, 102.2712407307806],
+            "Jalan Dekat Mushola Danau": [-3.7578554506276025, 102.27378528177347],
+            "Jalan depan FISIP": [-3.759976263597784, 102.27420444751262],
+            "Simpang Masuk dan Keluar Laboratorium Teknik Bagian Dalam": [-3.7592177976379157, 102.27697790803725],
+            "Jalan ke GB5": [-3.757361391237785, 102.27718010544687],
+            "Simpang Rektorat Gerbang Masuk": [-3.759424394475821, 102.27504039577254],
+            "Simpang UPA TIK": [-3.7588116661806517, 102.27480011556756],
+            "Simpang Perpus Danau": [-3.757622536129889, 102.27414480591212],
+            "Simpang Ujung Gerbang Masuk": [-3.755859423845089, 102.27370209863312],
+            "Simpang Dekanat Teknik dan Gerbang Keluar": [-3.7584095130154953, 102.2762751692775],
+            "Simpang LAB FKIP": [-3.7585115124344806, 102.27578350097083],
+            "Simpang Sekre Teknik dan Laboratorium": [-3.7581900448647274, 102.27717102708827],
+            "Jalan Keluar": [-3.7588307575600095, 102.2762976586807],
+            "Simpang GB5 dan Gedung FKIK": [-3.7557615850107857, 102.27683979338227],
+            "Jalan Samping Kuburan": [-3.7583939791096013, 102.27446766507919],
+            "Simpang Masuk dan Keluar Laboratorium Teknik Bagian Luar": [-3.758758959397839, 102.27654564408476],
+            "Jalan Keluar 2": [-3.7589622141455763, 102.27629233362865],
+            "Jalan Devan GSG": [-3.7581831402373593, 102.27665537652081],
+            "Simpang GLT dan Teknologi Pertanian": [-3.7584304360859755, 102.27106079578179],
+            "Jalan Danau 1": [-3.7577741804787284, 102.2739305205689],
+            "Jalan Danau 2": [-3.7578972968167674, 102.27372667268271],
+            "Jalan Danau 5": [-3.758021509038929, 102.27349696969101],
+            "Jalan Danau 6": [-3.75806320236126, 102.27339512321822],
+            "Jalan Danau 7": [-3.758138771502886, 102.27324627068108],
+            "Jalan Danau 4": [-3.7582514316396662, 102.27296680509195],
+            "Jalan GLT 1": [-3.7584149896911225, 102.27247850496857],
+            "Jalan GLT 3": [-3.7584202013577688, 102.27247850496691],
+            "Simpang GLT": [-3.758475525166938, 102.27210419746689],
+            "Jalan GLT 2": [-3.758519222948783, 102.27161150422778],
+            "Jalan GLT 4": [-3.7585270404428113, 102.27147421205628],
+            "Jalan GLT 5": [-3.7585368419887195, 102.27141082658717],
+            "Jalan GLT 6": [-3.7585597941193756, 102.27119997855868],
+            "Jalan Samping Rektorat": [-3.758844951793753, 102.27133207929076],
+            "Jalan Simpang Rektorat Belakang": [-3.759045600703256, 102.27155927526779],
+            "Jalan Belakang Parkiran Rektorat": [-3.7589700316401893, 102.2719927756391],
+            "Simpang GLT REKTORAT": [-3.7585926961478626, 102.27102781201282],
+            "Simpang Belokan Kiri Gerbang Rektorat": [-3.760652499089209, 102.27228400534246],
+            "Simpang Belakang Rektorat dan Parkiran Belakang": [-3.7590377112562137, 102.2715407994551],
+            "Simpang Rektorat dan GLT": [-3.7585921489104916, 102.2710313438033]
+        };
+
+        const map = L.map('map').setView([-3.7585, 102.2745], 16);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+
+        function inisialisasiDatalistPeta() {
+            const dl = document.getElementById('lokasiList');
+            dl.innerHTML = "";
+            Object.keys(nodes).sort((a, b) => a.localeCompare(b)).forEach(name => {
+                let option = document.createElement('option'); option.value = name;
+                dl.appendChild(option);
+            });
+        }
+
+        Object.keys(nodes).forEach(name => {
+            let isGedung = !name.startsWith("Simpang") && !name.startsWith("Jalan") && !name.startsWith("Jembatan");
+            let markerColor = isGedung ? "#11206a" : "#94a3b8";
+            let markerRadius = isGedung ? 6 : 4;
+            if (name.includes("Gerbang")) { markerColor = "#a99702"; markerRadius = 7; }
+            L.circleMarker(nodes[name], { radius: markerRadius, fillColor: markerColor, color: "#f8fafc", weight: 1.5, fillOpacity: 0.85 }).addTo(map).bindPopup(`<b>${name}</b>`);
+        });
+
+        inisialisasiDatalistPeta();
+        let routeLayer = null;
+
+        // JALUR / EDGES 
+        function buatGrafDinamis(hari, jam) {
+            const isOneWay = jam < 17;
+
+            return {
+                "Jalan Samping Kuburan": { "Simpang UPA TIK": 40, "Jalan depan FISIP": 160, "Simpang Perpus Danau": 30 },
+                "Simpang Perpus Danau": { "Jalan Samping Kuburan": 30, "Jalan Danau 1": 25, "Simpang Ujung Gerbang Masuk": 200 },
+                "Jalan Danau 1": { "Simpang Perpus Danau": 25, "Jalan Danau 2": 10 },
+                "Jalan Danau 2": { "Jalan Danau 1": 10, "Jalan Danau 5": 10, "Jalan Dekat Mushola Danau": 10 },
+                "Jalan Dekat Mushola Danau": { "Jalan Danau 2": 10, "Jembatan Danau": 10 },
+                "Jalan Danau 5": { "Jalan Danau 2": 10, "Jalan Danau 6": 10 },
+                "Jalan Danau 6": { "Jalan Danau 5": 10, "Jalan Danau 7": 10 },
+                "Jalan Danau 7": { "Jalan Danau 6": 10, "Jalan Danau 4": 10 },
+                "Jalan Danau 4": { "Jalan Danau 7": 10, "Jembatan Danau": 10, "Jalan GLT 3": 10 },
+                "Jembatan Danau": { "Jalan Danau 4": 10, "Jalan GLT 1": 15, "Jalan Jurusan Budidaya Pertanian": 220 },
+                "Danau": {}, 
+                "Jalan GLT 1": { "Jembatan Danau": 15, "Jalan GLT 3": 15 },
+                "Jalan GLT 3": { "Jalan GLT 1": 15, "Simpang GLT": 15, "Jalan Danau 4": 10 },
+                "Simpang GLT": { "Jalan GLT 3": 15, "Gedung GLT": 20, "Jalan GLT 2": 20 },
+                "Gedung GLT": { "Simpang GLT": 20, "Simpang Dalam GLT": 110 },
+                "Jalan GLT 2": { "Simpang GLT": 20, "Jalan GLT 4": 15 },
+                "Jalan GLT 4": { "Jalan GLT 2": 15, "Simpang Rektorat dan GLT": 15, "Jalan GLT 5": 10 },
+                "Jalan Belakang Parkiran Rektorat": { "Jalan Samping Rektorat": 40, "Jalan Simpang Rektorat Belakang": 15, "Gedung Rektorat UNIB": 15 },
+                "Jalan Simpang Rektorat Belakang": { "Jalan Belakang Parkiran Rektorat": 15, "Simpang Belakang Rektorat dan Parkiran Belakang": 10 },
+                "Simpang Belakang Rektorat dan Parkiran Belakang": { "Jalan Simpang Rektorat Belakang": 10, "Simpang Rektorat dan GLT": 40, "Simpang Belokan Kiri Gerbang Rektorat": 55 },
+                "Simpang Rektorat dan GLT": { "Simpang Belakang Rektorat dan Parkiran Belakang": 40, "Simpang GLT REKTORAT": 10, "Jalan Samping Rektorat": 35, "Jalan GLT 4": 15, "Jalan GLT 5": 10, "Jalan GLT 6": 10, "Jalan Teknologi Pertanian": 50, "Simpang GLT dan Teknologi Pertanian": 10 },
+                "Simpang GLT REKTORAT": { "Simpang Rektorat dan GLT": 10 },
+                "Jalan Samping Rektorat": { "Simpang Rektorat dan GLT": 35, "Jalan Belakang Parkiran Rektorat": 40 },
+                "Gedung Rektorat UNIB": { "Jalan Belakang Parkiran Rektorat": 15 },
+                "Jalan depan FISIP": { "Simpang UPA TIK": 140, "Jalan Samping Kuburan": 160, "Simpang Rektorat Gerbang Masuk": 90, "Simpang Belokan Kiri Gerbang Rektorat": 110 },
+                
+                "Gerbang Masuk": { 
+                    "Simpang Rektorat Gerbang Masuk": 20 
+                },
+                "Simpang Rektorat Gerbang Masuk": { 
+                    "Gerbang Masuk": (isOneWay ? Infinity : 20), 
+                    "Simpang UPA TIK": 75,
+                    "Jalan depan FISIP": 90, 
+                    "Gerbang Rektorat": (hari === "kerja" && jam < 17 ? 60 : Infinity)
+                },
+                "Simpang UPA TIK": { 
+                    "Simpang Rektorat Gerbang Masuk": (isOneWay ? Infinity : 75), 
+                    "Simpang Perpus Danau": 150, 
+                    "Jalan depan FISIP": 140, 
+                    "Simpang LAB FKIP": 30, 
+                    "Jalan Samping Kuburan": 40 
+                },
+                "Simpang LAB FKIP": { 
+                    "Simpang UPA TIK": (isOneWay ? Infinity : 30), 
+                    "Simpang Dekanat Teknik dan Gerbang Keluar": 55 
+                },
+
+                "Simpang Dekanat Teknik dan Gerbang Keluar": { 
+                    "Simpang LAB FKIP": (isOneWay ? Infinity : 55), 
+                    "Simpang Sekre Teknik dan Laboratorium": 50,
+                    "Jalan Depan GSG": 20,
+                    "Jalan Keluar": (jam < 17 ? 15 : Infinity) 
+                },
+                "Jalan Keluar": { 
+                    "Simpang Masuk dan Keluar Laboratorium Teknik Bagian Luar": (jam < 17 ? 10 : Infinity),
+                    "Gerbang Keluar": (jam < 17 ? 15 : Infinity), 
+                    "Simpang Dekanat Teknik dan Gerbang Keluar": (isOneWay ? Infinity : 15) 
+
+                },
+                "Jalan Keluar 2": { 
+                    "Gerbang Keluar": (jam < 17 ? 15 : Infinity) 
+                },
+                "Gerbang Keluar": { 
+                    "Jalan Keluar": (isOneWay ? Infinity : (jam < 17 ? 15 : Infinity)),
+                    "Jalan Keluar 2": (isOneWay ? Infinity : (jam < 17 ? 15 : Infinity))
+                },
+
+                "Gerbang Rektorat": { "Simpang Belokan Kiri Gerbang Rektorat": (hari === "kerja" && jam < 17 ? 20 : Infinity), "Simpang Rektorat Gerbang Masuk": (hari === "kerja" && jam < 17 ? 60 : Infinity) },
+                "Simpang Belokan Kiri Gerbang Rektorat": { "Gerbang Rektorat": (hari === "kerja" && jam < 17 ? 20 : Infinity), "Jalan depan FISIP": 110, "Simpang Belakang Rektorat dan Parkiran Belakang": 25 },
+                "Jalan GLT 5": { "Simpang Rektorat dan GLT": 10, "Jalan GLT 6": 15, "Jalan GLT 4": 10 },
+                "Jalan GLT 6": { "Jalan GLT 5": 15, "Simpang Rektorat dan GLT": 10 },
+                "Jalan Teknologi Pertanian": { "Jalan Belakang GLT": 40, "Simpang Rektorat dan GLT": 50, "Simpang GLT dan Teknologi Pertanian": 10 },
+                "Simpang GLT dan Teknologi Pertanian": { "Jalan Teknologi Pertanian": 10, "Simpang Rektorat dan GLT": 10 },
+                "Simpang Dalam GLT": { "Gedung GLT": 110, "Jalan Belakang GLT": 110, "Simpang Ujung Luar GLT": 90 },
+                "Jalan Belakang GLT": { "Simpang Dalam GLT": 110, "Jalan Teknologi Pertanian": 40, "Jalan Jurusan Budidaya Pertanian": 95 },
+                "Jalan Jurusan Budidaya Pertanian": { "Jalan Belakang GLT": 95, "Jembatan Danau": 220, "Simpang Ujung Gerbang Masuk": 120 },
+                "Simpang Ujung Gerbang Masuk": { "Jalan Jurusan Budidaya Pertanian": 120, "Simpang Perpus Danau": 35, "Jalan Dekanat FMIPA": 95 },
+                "Jalan Dekanat FMIPA": { "Simpang Ujung Gerbang Masuk": 95, "Simpang PKM Belakang": 110 },
+                "Simpang PKM Belakang": { "Jalan Dekanat FMIPA": 110, "Jalan Belakang PKM": 20 },
+                "Jalan Belakang PKM": { "Simpang PKM Belakang": 20, "Gedung GB5": 70 },
+                "Simpang Masuk dan Keluar Laboratorium Teknik Bagian Luar": { "Laboratorium Fakultas Teknik": 40, "Jalan Keluar": (jam < 17 ? 10 : Infinity) },
+                "Gedung Dekanat Teknik": { "Jalan Depan GSG": 25 },
+                "Laboratorium Fakultas Teknik": { "Simpang Masuk dan Keluar Laboratorium Teknik Bagian Luar": 40, "Simpang Masuk dan Keluar Laboratorium Teknik Bagian Dalam": 10 },
+                "Simpang Masuk dan Keluar Laboratorium Teknik Bagian Dalam": { "Laboratorium Fakultas Teknik": 10, "Laboratorium Terpadu Teknik Informatika": 30 },
+                "Simpang Sekre Teknik dan Laboratorium": { "Gedung Sekre Teknik": 20, "Laboratorium Terpadu Teknik Informatika": 45, "Simpang Dekanat Teknik dan Gerbang Keluar": 50, "Jalan ke GB5": 40, "Jalan Depan GSG": 20 },
+                "Gedung Sekre Teknik": { "Simpang Sekre Teknik dan Laboratorium": 20 },
+                "Laboratorium Terpadu Teknik Informatika": { "Simpang Sekre Teknik dan Laboratorium": 45, "Simpang Masuk dan Keluar Laboratorium Teknik Bagian Dalam": 30 },
+                "Jalan ke GB5": { "Simpang Sekre Teknik dan Laboratorium": 40, "Simpang GB5 dan Gedung FKIK": 120 },
+                "Simpang GB5 dan Gedung FKIK": { "Jalan ke GB5": 120, "Gedung GB5": 40 },
+                "Gedung GB5": { "Jalan Belakang PKM": 70, "Simpang GB5 dan Gedung FKIK": 40 },
+                "Jalan Depan GSG": { "GSG": 60, "Simpang Dekanat Teknik dan Gerbang Keluar": 20, "Simpang Sekre Teknik dan Laboratorium": 20, "Gedung Dekanat Teknik": 25 },
+                "GSG": { "Jalan Depan GSG": 60 }
+            };
+        }
+
+        // IMPLEMENTASI ALGORITMA DIJKSTRA 
+        function dijkstra(graf, start, end) {
+            let distances = {}; let prev = {}; let pq = [];
+            Object.keys(nodes).forEach(node => { distances[node] = Infinity; prev[node] = null; });
+            distances[start] = 0;
+            pq.push({ node: start, dist: 0 });
+
+            while (pq.length > 0) {
+                pq.sort((a, b) => a.dist - b.dist);
+                let current = pq.shift(); let u = current.node;
+                if (u === end) break;
+                if (graf[u]) {
+                    Object.keys(graf[u]).forEach(neighbor => {
+                        let alt = distances[u] + graf[u][neighbor];
+                        if (alt < distances[neighbor]) { distances[neighbor] = alt; prev[neighbor] = u; pq.push({ node: neighbor, dist: alt }); }
+                    });
+                }
+            }
+            let path = []; let u = end;
+            if (prev[u] || u === start) { while (u) { path.unshift(u); u = prev[u]; } }
+            return { path: path, distance: distances[end] };
+        }
+
+        // PROSES NAVIGASI UTAMA 
+        function prosesPencarianJalur() {
+            const start = document.getElementById('startNode').value.trim();
+            const end = document.getElementById('endNode').value.trim();
+            const hari = document.getElementById('inputHari').value;
+            const timeVal = document.getElementById('inputTime').value;
+            const jam = parseInt(timeVal.split(':')[0]);
+
+            const sidePanel = document.getElementById('sidePanel');
+            const infoBox = document.getElementById('hasilInfo');
+
+            if (!nodes[start] || !nodes[end]) { alert("Nama tempat salah atau tidak terdaftar!"); return; }
+
+            const grafSekarang = buatGrafDinamis(hari, jam);
+            const hasilFinal = dijkstra(grafSekarang, start, end);
+
+            if (routeLayer) map.removeLayer(routeLayer);
+
+            sidePanel.classList.remove('hidden');
+            sidePanel.classList.add('flex');
+
+            if (hasilFinal.path.length === 0 || hasilFinal.distance === Infinity) {
+                infoBox.innerHTML = `<div class="text-red-700 font-bold">❌ Jalur Buntu!</div>
+                                     <div class="text-xs text-slate-500 mt-1">Tidak ditemukan akses lintasan karena terhalang aturan satu arah atau gerbang tutup.</div>`;
+                setTimeout(() => { map.invalidateSize(); }, 100);
+                return;
+            }
+
+            infoBox.innerHTML = `
+                <div>
+                    <span class="text-xs uppercase font-semibold tracking-wider text-slate-400 block">Jarak Terpendek</span>
+                    <span class="text-2xl font-black text-[#11206a]">±${hasilFinal.distance} <span class="text-sm font-normal text-slate-500">meter</span></span>
+                </div>
+                <div class="border-t pt-3 flex flex-col overflow-hidden flex-grow">
+                    <span class="text-xs uppercase font-semibold tracking-wider text-slate-400 block mb-2">Rute Langkah</span>
+                    <div class="flex flex-col gap-1.5 text-xs text-slate-700 font-medium overflow-y-auto pr-1">
+                        ${hasilFinal.path.map((step, idx) => `
+                            <div class="flex items-start gap-2 p-2 rounded bg-slate-50 border border-slate-100">
+                                <span class="bg-[#11206a] text-white font-bold rounded h-5 w-5 flex items-center justify-center shrink-0 text-[10px]">${idx + 1}</span>
+                                <span class="pt-0.5">${step}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+
+            setTimeout(() => { map.invalidateSize(); }, 100);
+
+            const pointJalur = hasilFinal.path.map(namaNode => nodes[namaNode]);
+            routeLayer = L.polyline(pointJalur, { color: '#11206a', weight: 6, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+            map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+        }
+    </script>
+</body>
+</html>
