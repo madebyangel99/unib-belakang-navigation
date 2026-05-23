@@ -1,6 +1,6 @@
 # UNIB Belakang Navigation
 
-Web-based campus navigation system for the back area of Universitas Bengkulu using Dijkstra shortest path algorithm.
+Web-based campus navigation system for Universitas Bengkulu Belakang using Dijkstra shortest path algorithm.
 
 ## Features
 
